@@ -17,7 +17,7 @@ app = FastAPI(title="Spotify Wrapped So Far API", version="1.0.0")
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[os.getenv("FRONTEND_URL", "http://localhost:3000")],
+    allow_origins=["*"],  # Temporary - allow all origins
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
