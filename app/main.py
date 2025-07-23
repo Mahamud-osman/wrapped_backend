@@ -9,6 +9,7 @@ from .spotify_client import SpotifyClient
 from .auth import create_access_token, get_current_user_tokens
 from .models import SpotifyUser, Artist, Track, UserStats, TokenResponse
 from .utils import extract_genres_from_artists, calculate_listening_trends, calculate_average_features
+from .music_personality import MusicPersonalityAnalyzer
 
 load_dotenv()
 
@@ -24,6 +25,7 @@ app.add_middleware(
 )
 
 spotify_client = SpotifyClient()
+personality_analyzer = MusicPersonalityAnalyzer()
 
 @app.get("/")
 async def root():
@@ -225,6 +227,52 @@ async def get_user_stats(tokens: Dict[str, str] = Depends(get_current_user_token
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=400, detail=f"Failed to get user stats: {str(e)}")
+
+@app.get("/api/personality")
+async def get_music_personality(tokens: Dict[str, str] = Depends(get_current_user_tokens)):
+    """Get music personality analysis"""
+    try:
+        print("Analyzing music personality...")
+        
+        # Get data from Spotify
+        print("Getting top artists...")
+        top_artists = spotify_client.get_top_artists(tokens["access_token"], limit=30)
+        print(f"Got {len(top_artists)} artists")
+        
+        print("Getting top tracks...")
+        top_tracks = spotify_client.get_top_tracks(tokens["access_token"], limit=30)
+        print(f"Got {len(top_tracks)} tracks")
+        
+        # Get audio features for tracks
+        track_ids = [track.id for track in top_tracks]
+        print(f"Getting audio features for {len(track_ids)} tracks...")
+        audio_features = spotify_client.get_audio_features(tokens["access_token"], track_ids)
+        print(f"Got {len(audio_features)} audio features")
+        
+        # Analyze personality
+        print("Running personality analysis...")
+        personality_scores = personality_analyzer.analyze_personality(
+            top_artists, top_tracks, audio_features
+        )
+        
+        # Convert to JSON-serializable format
+        result = []
+        for score in personality_scores:
+            result.append({
+                "category": score.category,
+                "percentage": score.percentage,
+                "description": score.description,
+                "traits": score.traits
+            })
+        
+        print(f"Personality analysis completed with {len(result)} categories")
+        return {"personality_breakdown": result}
+        
+    except Exception as e:
+        print(f"Error in get_music_personality: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=400, detail=f"Failed to analyze personality: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn
